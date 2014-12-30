@@ -428,6 +428,7 @@ class PrintConfig : public GCodeConfig
     ConfigOptionInt                 min_fan_speed;
     ConfigOptionInt                 min_print_speed;
     ConfigOptionFloat               min_skirt_length;
+    ConfigOptionBool                grid_skirt;
     ConfigOptionString              notes;
     ConfigOptionFloats              nozzle_diameter;
     ConfigOptionBool                only_retract_when_crossing_perimeters;
@@ -490,6 +491,7 @@ class PrintConfig : public GCodeConfig
         this->min_fan_speed.value                                = 35;
         this->min_print_speed.value                              = 10;
         this->min_skirt_length.value                             = 0;
+        this->grid_skirt.value                                   = false;
         this->notes.value                                        = "";
         this->nozzle_diameter.values.resize(1);
         this->nozzle_diameter.values[0]                          = 0.5;
@@ -550,6 +552,7 @@ class PrintConfig : public GCodeConfig
         if (opt_key == "min_fan_speed")                              return &this->min_fan_speed;
         if (opt_key == "min_print_speed")                            return &this->min_print_speed;
         if (opt_key == "min_skirt_length")                           return &this->min_skirt_length;
+        if (opt_key == "grid_skirt")                                 return &this->grid_skirt;
         if (opt_key == "notes")                                      return &this->notes;
         if (opt_key == "nozzle_diameter")                            return &this->nozzle_diameter;
         if (opt_key == "only_retract_when_crossing_perimeters")      return &this->only_retract_when_crossing_perimeters;

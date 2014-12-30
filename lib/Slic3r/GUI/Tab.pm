@@ -445,7 +445,7 @@ sub build {
         first_layer_speed
         perimeter_acceleration infill_acceleration bridge_acceleration 
         first_layer_acceleration default_acceleration
-        skirts skirt_distance skirt_height min_skirt_length
+        skirts skirt_distance skirt_height min_skirt_length grid_skirt
         brim_width
         support_material support_material_threshold support_material_enforce_layers
         raft_layers
@@ -533,6 +533,7 @@ sub build {
             $optgroup->append_single_option_line('skirt_distance');
             $optgroup->append_single_option_line('skirt_height');
             $optgroup->append_single_option_line('min_skirt_length');
+            $optgroup->append_single_option_line('grid_skirt');
         }
         {
             my $optgroup = $page->new_optgroup('Brim');

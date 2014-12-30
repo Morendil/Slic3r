@@ -484,6 +484,12 @@ PrintConfigDef::build_def() {
     Options["min_skirt_length"].cli = "min-skirt-length=f";
     Options["min_skirt_length"].min = 0;
 
+    Options["grid_skirt"].type = coBool;
+    Options["grid_skirt"].label = "Add grid";
+    Options["grid_skirt"].tooltip = "Lays a grid inside the skirt to improve ad
+    Options["grid_skirt"].cli = "grid_skirt!";
+    Options["grid_skirt"].gui_flags = "serialized";
+
     Options["notes"].type = coString;
     Options["notes"].label = "Configuration notes";
     Options["notes"].tooltip = "You can put here your personal notes. This text will be added to the G-code header comments.";
