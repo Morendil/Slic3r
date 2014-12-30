@@ -11,6 +11,9 @@ use Slic3r::Geometry qw(X Y Z X1 Y1 X2 Y2 MIN MAX PI scale unscale convex_hull);
 use Slic3r::Geometry::Clipper qw(diff_ex union_ex intersection_ex intersection offset
     offset2 union union_pt_chained JT_ROUND JT_SQUARE);
 use Slic3r::Print::State ':steps';
+use Slic3r::Fill;
+use Slic3r::Surface;
+use Slic3r::ExPolygon;
 
 our $status_cb;
 
@@ -185,29 +188,9 @@ EOF
     print "Done.\n" unless $params{quiet};
 }
 
-sub make_skirt {
+sub skirt_height {
     my $self = shift;
-    
-    # prerequisites
-    $_->make_perimeters for @{$self->objects};
-    $_->infill for @{$self->objects};
-    $_->generate_support_material for @{$self->objects};
-    
-    return if $self->step_done(STEP_SKIRT);
-    $self->set_step_started(STEP_SKIRT);
-    
-    # since this method must be idempotent, we clear skirt paths *before*
-    # checking whether we need to generate them
-    $self->skirt->clear;
-    
-    if ($self->config->skirts == 0
-        && (!$self->config->ooze_prevention || @{$self->extruders} == 1)) {
-        $self->set_step_done(STEP_SKIRT);
-        return;
-    }
-    $self->status_cb->(88, "Generating skirt");
-    
-    # First off we need to decide how tall the skirt must be.
+
     # The skirt_height option from config is expressed in layers, but our
     # object might have different layer heights, so we need to find the print_z
     # of the highest layer involved.
@@ -226,7 +209,14 @@ sub make_skirt {
         my $highest_layer = $object->get_layer($skirt_height - 1);
         $skirt_height_z = max($skirt_height_z, $highest_layer->print_z);
     }
-    
+
+    return $skirt_height_z;
+}
+
+sub skirt_points {
+    my $self = shift;
+    my $skirt_height_z = shift;
+
     # collect points from all layers contained in skirt height
     my @points = ();
     foreach my $object (@{$self->objects}) {
@@ -252,6 +242,37 @@ sub make_skirt {
             push @points, @copy_points;
         }
     }
+
+    return @points;
+}
+
+sub make_skirt {
+    my $self = shift;
+    
+    # prerequisites
+    $_->make_perimeters for @{$self->objects};
+    $_->infill for @{$self->objects};
+    $_->generate_support_material for @{$self->objects};
+    
+    return if $self->step_done(STEP_SKIRT);
+    $self->set_step_started(STEP_SKIRT);
+    
+    # since this method must be idempotent, we clear skirt paths *before*
+    # checking whether we need to generate them
+    $self->skirt->clear;
+    
+    if ($self->config->skirts == 0
+        && (!$self->config->ooze_prevention || @{$self->extruders} == 1)) {
+        $self->set_step_done(STEP_SKIRT);
+        return;
+    }
+    $self->status_cb->(88, "Generating skirt");
+    
+    # First off we need to decide how tall the skirt must be.
+    my $skirt_height_z = $self->skirt_height;
+    
+    # collect points from all layers contained in skirt height
+    my @points = $self->skirt_points($skirt_height_z);
     return if @points < 3;  # at least three points required for a convex hull
     
     # find out convex hull
@@ -304,8 +325,33 @@ sub make_skirt {
             }
         }
     }
-    
+
     $self->skirt->reverse;
+
+    $distance = scale max($self->config->skirt_distance, $self->config->brim_width);
+    if ($self->config->grid_skirt) {
+        my $filler = Slic3r::Fill->new->filler("rectilinear");
+        my $surface = Slic3r::Surface->new(
+            expolygon => Slic3r::ExPolygon->new(offset([$convex_hull], $distance, 1, JT_ROUND, scale(0.1))->[0]),
+            surface_type => Slic3r::Surface::S_TYPE_INTERNAL,
+        );
+        $filler->angle(0.785398163);
+        $filler->spacing($flow->spacing);
+        my @polylines = $filler->fill_surface(
+            $surface,
+            density         => 0.05,
+            layer_height    => $first_layer_height,
+        );
+        $self->skirt->append(Slic3r::ExtrusionLoop->new_from_paths(
+            Slic3r::ExtrusionPath->new(
+                polyline        => $polylines[0],
+                role            => EXTR_ROLE_SKIRT,
+                mm3_per_mm      => $mm3_per_mm,         # this will be overridden at G-code export time
+                width           => $flow->width,
+                height          => $first_layer_height, # this will be overridden at G-code export time
+            ),
+        ));
+    }
     
     $self->set_step_done(STEP_SKIRT);
 }
